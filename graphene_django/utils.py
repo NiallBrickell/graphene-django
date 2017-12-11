@@ -3,8 +3,6 @@ import inspect
 from django.db import models
 from django.db.models.manager import Manager
 
-from .compat import RelatedObject
-
 
 # from graphene.utils import LazyList
 
@@ -16,25 +14,23 @@ class LazyList(object):
 try:
     import django_filters  # noqa
     DJANGO_FILTER_INSTALLED = True
-except (ImportError, AttributeError):
-    # AtributeError raised if DjangoFilters installed with a incompatible Django Version
+except ImportError:
     DJANGO_FILTER_INSTALLED = False
 
 
-def get_reverse_fields(model):
+def get_reverse_fields(model, local_field_names):
     for name, attr in model.__dict__.items():
+        # Don't duplicate any local fields
+        if name in local_field_names:
+            continue
+
         # Django =>1.9 uses 'rel', django <1.9 uses 'related'
         related = getattr(attr, 'rel', None) or \
             getattr(attr, 'related', None)
-        if isinstance(related, RelatedObject):
-            # Hack for making it compatible with Django 1.6
-            new_related = RelatedObject(related.parent_model, related.model, related.field)
-            new_related.name = name
-            yield new_related
-        elif isinstance(related, models.ManyToOneRel):
-            yield related
+        if isinstance(related, models.ManyToOneRel):
+            yield (name, related)
         elif isinstance(related, models.ManyToManyRel) and not related.symmetrical:
-            yield related
+            yield (name, related)
 
 
 def maybe_queryset(value):
@@ -44,19 +40,20 @@ def maybe_queryset(value):
 
 
 def get_model_fields(model):
-    reverse_fields = get_reverse_fields(model)
-    all_fields = sorted(list(model._meta.fields) +
-                        list(model._meta.local_many_to_many))
-    all_fields += list(reverse_fields)
+    local_fields = [
+        (field.name, field)
+        for field
+        in sorted(list(model._meta.fields) +
+                  list(model._meta.local_many_to_many))
+    ]
+
+    # Make sure we don't duplicate local fields with "reverse" version
+    local_field_names = [field[0] for field in local_fields]
+    reverse_fields = get_reverse_fields(model, local_field_names)
+
+    all_fields = local_fields + list(reverse_fields)
 
     return all_fields
-
-
-def get_related_model(field):
-    if hasattr(field, 'rel'):
-        # Django 1.6, 1.7
-        return field.rel.to
-    return field.related_model
 
 
 def is_valid_django_model(model):

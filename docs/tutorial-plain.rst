@@ -8,14 +8,14 @@ Our primary focus here is to give a good understanding of how to connect models 
 
 A good idea is to check the `graphene <http://docs.graphene-python.org/en/latest/>`__ documentation first.
 
-Setup the Django project
-------------------------
+Set up the Django project
+-------------------------
 
 You can find the entire project in ``examples/cookbook-plain``.
 
 ----
 
-We will setup the project, create the following:
+We will set up the project, create the following:
 
 -  A Django project called ``cookbook``
 -  An app within ``cookbook`` called ``ingredients``
@@ -73,12 +73,23 @@ Let's get started with these models:
         def __str__(self):
             return self.name
 
+Add ingredients as INSTALLED_APPS:
+
+.. code:: python
+
+    INSTALLED_APPS = [
+        ...
+        # Install the ingredients app
+        'ingredients',
+    ]
+
 Don't forget to create & run migrations:
 
 .. code:: bash
 
     python manage.py makemigrations
     python manage.py migrate
+    
 
 Load some test data
 ^^^^^^^^^^^^^^^^^^^
@@ -95,7 +106,7 @@ following:
     $ python ./manage.py loaddata ingredients
 
     Installed 6 object(s) from 1 fixture(s)
-
+    
 Alternatively you can use the Django admin interface to create some data
 yourself. You'll need to run the development server (see below), and
 create a login for yourself too (``./manage.py createsuperuser``).
@@ -142,14 +153,14 @@ Create ``cookbook/ingredients/schema.py`` and type the following:
             model = Ingredient
 
 
-    class Query(graphene.AbstractType):
+    class Query(object):
         all_categories = graphene.List(CategoryType)
         all_ingredients = graphene.List(IngredientType)
 
-        def resolve_all_categories(self, args, context, info):
+        def resolve_all_categories(self, info, **kwargs):
             return Category.objects.all()
 
-        def resolve_all_ingredients(self, args, context, info):
+        def resolve_all_ingredients(self, info, **kwargs):
             # We can easily optimize query count in the resolve method
             return Ingredient.objects.select_related('category').all()
 
@@ -190,7 +201,7 @@ a web-based integrated development environment to assist in the writing
 and executing of GraphQL queries. It will provide us with a simple and
 easy way of testing our cookbook project.
 
-Add ``ingredients`` and ``graphene_django`` to ``INSTALLED_APPS`` in ``cookbook/settings.py``:
+Add ``graphene_django`` to ``INSTALLED_APPS`` in ``cookbook/settings.py``:
 
 .. code:: python
 
@@ -198,9 +209,6 @@ Add ``ingredients`` and ``graphene_django`` to ``INSTALLED_APPS`` in ``cookbook/
         ...
         # This will also make the `graphql_schema` management command available
         'graphene_django',
-
-        # Install the ingredients app
-        'ingredients',
     ]
 
 And then add the ``SCHEMA`` to the ``GRAPHENE`` config in ``cookbook/settings.py``:
@@ -418,7 +426,7 @@ We can update our schema to support that, by adding new query for ``ingredient``
           model = Ingredient
 
 
-  class Query(graphene.AbstractType):
+  class Query(object):
       category = graphene.Field(CategoryType,
                                 id=graphene.Int(),
                                 name=graphene.String())
@@ -430,15 +438,15 @@ We can update our schema to support that, by adding new query for ``ingredient``
                                   name=graphene.String())
       all_ingredients = graphene.List(IngredientType)
 
-      def resolve_all_categories(self, args, context, info):
+      def resolve_all_categories(self, info, **kwargs):
           return Category.objects.all()
 
-      def resolve_all_ingredients(self, args, context, info):
+      def resolve_all_ingredients(self, info, **kwargs):
           return Ingredient.objects.all()
 
-      def resolve_category(self, args, context, info):
-          id = args.get('id')
-          name = args.get('name')
+      def resolve_category(self, info, **kwargs):
+          id = kwargs.get('id')
+          name = kwargs.get('name')
 
           if id is not None:
               return Category.objects.get(pk=id)
@@ -448,9 +456,9 @@ We can update our schema to support that, by adding new query for ``ingredient``
 
           return None
 
-      def resolve_ingredient(self, args, context, info):
-          id = args.get('id')
-          name = args.get('name')
+      def resolve_ingredient(self, info, **kwargs):
+          id = kwargs.get('id')
+          name = kwargs.get('name')
 
           if id is not None:
               return Ingredient.objects.get(pk=id)

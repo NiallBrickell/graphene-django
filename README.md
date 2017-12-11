@@ -1,4 +1,4 @@
-Please read [UPGRADE-v1.0.md](https://github.com/graphql-python/graphene/blob/master/UPGRADE-v1.0.md) to learn how to upgrade to Graphene `1.0`.
+Please read [UPGRADE-v2.0.md](https://github.com/graphql-python/graphene/blob/master/UPGRADE-v2.0.md) to learn how to upgrade to Graphene `2.0`.
 
 ---
 
@@ -9,10 +9,10 @@ A [Django](https://www.djangoproject.com/) integration for [Graphene](http://gra
 
 ## Installation
 
-For instaling graphene, just run this command in your shell
+For installing graphene, just run this command in your shell
 
 ```bash
-pip install "graphene-django>=1.0"
+pip install "graphene-django>=2.0"
 ```
 
 ### Settings
@@ -67,8 +67,7 @@ class User(DjangoObjectType):
 class Query(graphene.ObjectType):
     users = graphene.List(User)
 
-    @graphene.resolve_only_args
-    def resolve_users(self):
+    def resolve_users(self, info):
         return UserModel.objects.all()
 
 schema = graphene.Schema(query=Query)
@@ -111,7 +110,7 @@ py.test graphene_django --cov=graphene_django # Use -v -s for verbose mode
 
 ### Documentation
 
-The documentation is generated using the excellent [Sphinx](http://www.sphinx-doc.org/) and a custom theme.
+The [documentation](http://docs.graphene-python.org/projects/django/en/latest/) is generated using the excellent [Sphinx](http://www.sphinx-doc.org/) and a custom theme.
 
 The documentation dependencies are installed by running:
 

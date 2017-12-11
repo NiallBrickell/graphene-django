@@ -4,7 +4,7 @@ Filtering
 Graphene integrates with
 `django-filter <https://django-filter.readthedocs.org>`__ to provide
 filtering of results. See the `usage
-documentation <https://django-filter.readthedocs.org/en/latest/usage.html#the-filter>`__
+documentation <https://django-filter.readthedocs.io/en/latest/guide/usage.html#the-filter>`__
 for details on the format for ``filter_fields``.
 
 This filtering is automatically available when implementing a ``relay.Node``.
@@ -26,7 +26,7 @@ Filterable fields
 The ``filter_fields`` parameter is used to specify the fields which can
 be filtered upon. The value specified here is passed directly to
 ``django-filter``, so see the `filtering
-documentation <https://django-filter.readthedocs.org/en/latest/usage.html#the-filter>`__
+documentation <https://django-filter.readthedocs.io/en/latest/guide/usage.html#the-filter>`__
 for full details on the range of options available.
 
 For example:
@@ -114,7 +114,7 @@ create your own ``Filterset`` as follows:
 
     class AnimalFilter(django_filters.FilterSet):
         # Do case-insensitive lookups on 'name'
-        name = django_filters.CharFilter(lookup_type='iexact')
+        name = django_filters.CharFilter(lookup_expr=['iexact'])
 
         class Meta:
             model = Animal
@@ -126,3 +126,23 @@ create your own ``Filterset`` as follows:
         # We specify our custom AnimalFilter using the filterset_class param
         all_animals = DjangoFilterConnectionField(AnimalNode,
                                                   filterset_class=AnimalFilter)
+
+The context argument is passed on as the `request argument <http://django-filter.readthedocs.io/en/latest/guide/usage.html#request-based-filtering>`__
+in a ``django_filters.FilterSet`` instance. You can use this to customize your
+filters to be context-dependent. We could modify the ``AnimalFilter`` above to
+pre-filter animals owned by the authenticated user (set in ``context.user``).
+
+.. code:: python
+
+    class AnimalFilter(django_filters.FilterSet):
+        # Do case-insensitive lookups on 'name'
+        name = django_filters.CharFilter(lookup_type='iexact')
+
+        class Meta:
+            model = Animal
+            fields = ['name', 'genus', 'is_domesticated']
+
+        @property
+        def qs(self):
+            # The query context can be found in self.request.
+            return super(AnimalFilter, self).filter(owner=self.request.user)

@@ -1,14 +1,14 @@
 from mock import patch
 
-from graphene import Interface, ObjectType, Schema
+from graphene import Interface, ObjectType, Schema, Connection, String
 from graphene.relay import Node
 
-from ..registry import reset_global_registry
+from .. import registry
 from ..types import DjangoObjectType
 from .models import Article as ArticleModel
 from .models import Reporter as ReporterModel
 
-reset_global_registry()
+registry.reset_global_registry()
 
 
 class Reporter(DjangoObjectType):
@@ -17,11 +17,23 @@ class Reporter(DjangoObjectType):
         model = ReporterModel
 
 
+class ArticleConnection(Connection):
+    '''Article Connection'''
+    test = String()
+
+    def resolve_test():
+        return 'test'
+
+    class Meta:
+        abstract = True
+
+
 class Article(DjangoObjectType):
     '''Article description'''
     class Meta:
         model = ArticleModel
         interfaces = (Node, )
+        connection_class = ArticleConnection
 
 
 class RootQuery(ObjectType):
@@ -38,7 +50,7 @@ def test_django_interface():
 
 @patch('graphene_django.tests.models.Article.objects.get', return_value=Article(id=1))
 def test_django_get_node(get):
-    article = Article.get_node(1, None, None)
+    article = Article.get_node(None, 1)
     get.assert_called_with(pk=1)
     assert article.id == 1
 
@@ -74,6 +86,7 @@ type Article implements Node {
 type ArticleConnection {
   pageInfo: PageInfo!
   edges: [ArticleEdge]!
+  test: String
 }
 
 type ArticleEdge {
@@ -124,3 +137,42 @@ type RootQuery {
 }
 """.lstrip()
     assert str(schema) == expected
+
+
+def with_local_registry(func):
+    def inner(*args, **kwargs):
+        old = registry.get_global_registry()
+        registry.reset_global_registry()
+        try:
+            retval = func(*args, **kwargs)
+        except Exception as e:
+            registry.registry = old
+            raise e
+        else:
+            registry.registry = old
+            return retval
+    return inner
+
+
+@with_local_registry
+def test_django_objecttype_only_fields():
+    class Reporter(DjangoObjectType):
+        class Meta:
+            model = ReporterModel
+            only_fields = ('id', 'email', 'films')
+
+
+    fields = list(Reporter._meta.fields.keys())
+    assert fields == ['id', 'email', 'films']
+
+
+@with_local_registry
+def test_django_objecttype_exclude_fields():
+    class Reporter(DjangoObjectType):
+        class Meta:
+            model = ReporterModel
+            exclude_fields = ('email')
+
+
+    fields = list(Reporter._meta.fields.keys())
+    assert 'email' not in fields

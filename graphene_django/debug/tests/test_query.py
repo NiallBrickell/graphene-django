@@ -3,7 +3,6 @@ import pytest
 import graphene
 from graphene.relay import Node
 from graphene_django import DjangoConnectionField, DjangoObjectType
-from graphene_django.utils import DJANGO_FILTER_INSTALLED
 
 from ...tests.models import Reporter
 from ..middleware import DjangoDebugMiddleware
@@ -34,7 +33,7 @@ def test_should_query_field():
         reporter = graphene.Field(ReporterType)
         debug = graphene.Field(DjangoDebug, name='__debug')
 
-        def resolve_reporter(self, *args, **kwargs):
+        def resolve_reporter(self, info, **args):
             return Reporter.objects.first()
 
     query = '''
@@ -81,7 +80,7 @@ def test_should_query_list():
         all_reporters = graphene.List(ReporterType)
         debug = graphene.Field(DjangoDebug, name='__debug')
 
-        def resolve_all_reporters(self, *args, **kwargs):
+        def resolve_all_reporters(self, info, **args):
             return Reporter.objects.all()
 
     query = '''
@@ -130,7 +129,7 @@ def test_should_query_connection():
         all_reporters = DjangoConnectionField(ReporterType)
         debug = graphene.Field(DjangoDebug, name='__debug')
 
-        def resolve_all_reporters(self, *args, **kwargs):
+        def resolve_all_reporters(self, info, **args):
             return Reporter.objects.all()
 
     query = '''
@@ -167,8 +166,6 @@ def test_should_query_connection():
     assert result.data['__debug']['sql'][1]['rawSql'] == query
 
 
-@pytest.mark.skipif(not DJANGO_FILTER_INSTALLED,
-                    reason="requires django-filter")
 def test_should_query_connectionfilter():
     from ...filter import DjangoFilterConnectionField
 
@@ -184,11 +181,11 @@ def test_should_query_connectionfilter():
             interfaces = (Node, )
 
     class Query(graphene.ObjectType):
-        all_reporters = DjangoFilterConnectionField(ReporterType)
+        all_reporters = DjangoFilterConnectionField(ReporterType, fields=['last_name'])
         s = graphene.String(resolver=lambda *_: "S")
         debug = graphene.Field(DjangoDebug, name='__debug')
 
-        def resolve_all_reporters(self, *args, **kwargs):
+        def resolve_all_reporters(self, info, **args):
             return Reporter.objects.all()
 
     query = '''

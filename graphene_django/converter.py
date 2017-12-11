@@ -2,17 +2,15 @@ from django.db import models
 from django.utils.encoding import force_text
 
 from graphene import (ID, Boolean, Dynamic, Enum, Field, Float, Int, List,
-                      NonNull, String)
-from graphene.relay import is_node
+                      NonNull, String, UUID)
 from graphene.types.datetime import DateTime, Time
 from graphene.types.json import JSONString
 from graphene.utils.str_converters import to_camel_case, to_const
 from graphql import assert_valid_name
 
-from .compat import (ArrayField, HStoreField, JSONField, RangeField,
-                     RelatedObject, UUIDField, DurationField)
-from .fields import get_connection_field, DjangoListField
-from .utils import get_related_model, import_single_dispatch
+from .compat import ArrayField, HStoreField, JSONField, RangeField
+from .fields import DjangoListField, DjangoConnectionField
+from .utils import import_single_dispatch
 
 singledispatch = import_single_dispatch()
 
@@ -42,6 +40,10 @@ def get_choices(choices):
 
 
 def convert_django_field_with_choices(field, registry=None):
+    if registry is not None:
+        converted = registry.get_converted_field(field)
+        if converted:
+            return converted
     choices = getattr(field, 'choices', None)
     if choices:
         meta = field.model._meta
@@ -57,8 +59,12 @@ def convert_django_field_with_choices(field, registry=None):
                 return named_choices_descriptions[self.name]
 
         enum = Enum(name, list(named_choices), type=EnumWithDescriptionsType)
-        return enum(description=field.help_text, required=not field.null)
-    return convert_django_field(field, registry)
+        converted = enum(description=field.help_text, required=not field.null)
+    else:
+        converted = convert_django_field(field, registry)
+    if registry is not None:
+        registry.register_converted_field(field, converted)
+    return converted
 
 
 @singledispatch
@@ -80,9 +86,13 @@ def convert_field_to_string(field, registry=None):
 
 
 @convert_django_field.register(models.AutoField)
-@convert_django_field.register(UUIDField)
 def convert_field_to_id(field, registry=None):
     return ID(description=field.help_text, required=not field.null)
+
+
+@convert_django_field.register(models.UUIDField)
+def convert_field_to_uuid(field, registry=None):
+    return UUID(description=field.help_text, required=not field.null)
 
 
 @convert_django_field.register(models.PositiveIntegerField)
@@ -106,7 +116,7 @@ def convert_field_to_nullboolean(field, registry=None):
 
 @convert_django_field.register(models.DecimalField)
 @convert_django_field.register(models.FloatField)
-@convert_django_field.register(DurationField)
+@convert_django_field.register(models.DurationField)
 def convert_field_to_float(field, registry=None):
     return Float(description=field.help_text, required=not field.null)
 
@@ -123,7 +133,7 @@ def convert_time_to_string(field, registry=None):
 
 @convert_django_field.register(models.OneToOneRel)
 def convert_onetoone_field_to_djangomodel(field, registry=None):
-    model = get_related_model(field)
+    model = field.related_model
 
     def dynamic_type():
         _type = registry.get_type_for_model(model)
@@ -142,36 +152,24 @@ def convert_onetoone_field_to_djangomodel(field, registry=None):
 @convert_django_field.register(models.ManyToManyRel)
 @convert_django_field.register(models.ManyToOneRel)
 def convert_field_to_list_or_connection(field, registry=None):
-    model = get_related_model(field)
+    model = field.related_model
 
     def dynamic_type():
         _type = registry.get_type_for_model(model)
         if not _type:
             return
 
-        if is_node(_type):
-            return get_connection_field(_type)
+        # If there is a connection, we should transform the field
+        # into a DjangoConnectionField
+        if _type._meta.connection:
+            # Use a DjangoFilterConnectionField if there are
+            # defined filter_fields in the DjangoObjectType Meta
+            if _type._meta.filter_fields:
+                from .filter.fields import DjangoFilterConnectionField
+                return DjangoFilterConnectionField(_type)
 
-        return DjangoListField(_type)
+            return DjangoConnectionField(_type)
 
-    return Dynamic(dynamic_type)
-
-
-# For Django 1.6
-@convert_django_field.register(RelatedObject)
-def convert_relatedfield_to_djangomodel(field, registry=None):
-    model = field.model
-
-    def dynamic_type():
-        _type = registry.get_type_for_model(model)
-        if not _type:
-            return
-
-        if isinstance(field.field, models.OneToOneField):
-            return Field(_type)
-
-        if is_node(_type):
-            return get_connection_field(_type)
         return DjangoListField(_type)
 
     return Dynamic(dynamic_type)
@@ -180,7 +178,7 @@ def convert_relatedfield_to_djangomodel(field, registry=None):
 @convert_django_field.register(models.OneToOneField)
 @convert_django_field.register(models.ForeignKey)
 def convert_field_to_djangomodel(field, registry=None):
-    model = get_related_model(field)
+    model = field.related_model
 
     def dynamic_type():
         _type = registry.get_type_for_model(model)

@@ -1,6 +1,6 @@
 Please read
-`UPGRADE-v1.0.md <https://github.com/graphql-python/graphene/blob/master/UPGRADE-v1.0.md>`__
-to learn how to upgrade to Graphene ``1.0``.
+`UPGRADE-v2.0.md <https://github.com/graphql-python/graphene/blob/master/UPGRADE-v2.0.md>`__
+to learn how to upgrade to Graphene ``2.0``.
 
 --------------
 
@@ -13,11 +13,11 @@ A `Django <https://www.djangoproject.com/>`__ integration for
 Installation
 ------------
 
-For instaling graphene, just run this command in your shell
+For installing graphene, just run this command in your shell
 
 .. code:: bash
 
-    pip install "graphene-django>=1.0"
+    pip install "graphene-django>=2.0"
 
 Settings
 ~~~~~~~~
@@ -120,7 +120,7 @@ After developing, the full test suite can be evaluated by running:
 Documentation
 ~~~~~~~~~~~~~
 
-The documentation is generated using the excellent
+The `documentation <http://docs.graphene-python.org/projects/django/en/latest/>`__ is generated using the excellent
 `Sphinx <http://www.sphinx-doc.org/>`__ and a custom theme.
 
 The documentation dependencies are installed by running:
